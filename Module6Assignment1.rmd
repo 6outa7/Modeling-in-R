@@ -1,0 +1,114 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+## Task 1
+There seems to be 4 sections of drivers, 2 that drive short distances and 2 that drive long distances. There are further splits in each of those categories: those who speed some and those who speed more. The long haul drivers seem to speed the most often.
+
+## Task 2
+Done, see below
+
+## Task 3 
+Two clusters is a split by one variable - Distance. The data has more to tell us, we should let it.
+
+## Task 4
+Both models indicate that 4 clusters is the optimal.
+
+## Task 5
+Done, see below.
+
+## Task 6
+As I mentioned in Task 1, there are 4 sections of drivers, 2 that drive short distances and 2 that drive long distances. There are further splits in each of those categories: those who speed some and those who speed more. The long haul drivers seem to speed the most often. 
+The hypotheses I would explore are whether short haul drivers do not have the opportunity or necessity to speed as much as the long haul drivers.  If we could have one more variable, I'd include "percent late".
+
+## Task 7 
+There is not concensus between the two methods - one says 2, the other 8.
+
+## Task 8
+Done, see below
+
+## Task 9
+First, I think I'd have to get to know the data better to draw any conclusions but... I think 3 clusters is a better split, it definitely makes for 3 distinct groups. Since 0 is average, I'd say that cluster 3 is the underperformer here with cluster 4 looking the best - above average for both variables.
+```{r}
+options(tidyverse.quiet=TRUE)
+library(tidyverse)
+library(cluster) #algorithms for clustering
+library(factoextra) #visualization
+library(dendextend) #viewing clustering dendograms
+
+```
+
+```{r}
+trucks = read_csv("trucks.csv")
+str(trucks)
+summary(trucks)
+```
+```{r}
+ggplot(trucks, aes(x=Distance,y=Speeding)) + geom_point() 
+```
+
+```{r}
+trucks2 = as.data.frame(trucks %>% select(c("Distance","Speeding")))
+trucks2 = scale(trucks2) 
+summary(trucks2)
+```
+```{r}
+set.seed(64)
+clusters1 <- kmeans(trucks2, 2)
+fviz_cluster(clusters1, trucks2)
+```
+```{r}
+set.seed(64)
+fviz_nbclust(trucks2, kmeans, method = "wss") #minimize within-cluster variation
+```
+Another method  
+```{r}
+set.seed(123)
+fviz_nbclust(trucks2, kmeans, method = "silhouette") #maximize how well points sit in their clusters
+```
+
+```{r}
+set.seed(64)
+clusters1 <- kmeans(trucks2, 4)
+fviz_cluster(clusters1, trucks2)
+```
+
+```{r}
+bball = read_csv("kenpom20.csv")
+str(bball)
+```
+```{r}
+bball2 = as.data.frame(bball %>% select(c(2:12)))
+bball2 = as.data.frame(scale(bball2))
+```
+
+```{r}
+set.seed(123)
+fviz_nbclust(bball2, kmeans, method = "wss") #minimize within-cluster variation
+```
+Another method  
+```{r}
+set.seed(123)
+fviz_nbclust(bball2, kmeans, method = "silhouette")
+```
+
+```{r}
+set.seed(64)
+clusters3 <- kmeans(bball2, 4)
+fviz_cluster(clusters3, bball2)
+```
+
+```{r}
+cluster1 = as.data.frame(clusters3$cluster)
+bball2 = bind_cols(bball2,cluster1)
+
+```
+
+```{r}
+ggplot(bball2, aes(x=AdjOE,y=AdjDE)) + geom_point(aes(color=clusters3$cluster))+
+  geom_smooth(method="lm")
+```
+
+
