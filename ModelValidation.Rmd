@@ -1,0 +1,59 @@
+## Demonstrating Train/Test Split for Model Validation on Credit Dataset
+
+Libraries  
+```{r}
+library(tidyverse)
+library(GGally) #for ggpairs function
+library(MASS) #access to forward and backward selection algorithms
+library(leaps) #best subset selection
+library(caret) #for splitting for validation
+```
+
+Read-in dataset  
+```{r}
+credit = read_csv("CreditData.csv")
+```
+
+Get rid of missing data rows (**any data cleaning/prepartion should take place before splitting**).  
+```{r}
+credit = credit %>% drop_na() #delete any row with an NA value
+str(credit) #check structure after the drop
+```
+
+Split the data (training and testing)  
+```{r}
+set.seed(123)
+train.rows = createDataPartition(y = credit$AnnualCharges, p=0.7, list = FALSE) #70% in training
+train = slice(credit, train.rows)
+test = slice(credit, -train.rows)
+```
+
+AFTER you split, then do visualization and modeling with the **training set**.  
+
+Our Y (response) variable in this dataset is "AnnualCharges".  Let's look at ggpairs plot for visualization and correlation.  
+```{r}
+ggpairs(train)
+```
+
+Model with best single variable (by correlation).  
+```{r}
+mod1 = lm(AnnualCharges ~ AnnualIncome, train) #create linear regression model
+summary(mod1) #examine the model
+```
+
+Let's assume (for the sake of time) that this model is our best model.  The R squared value for this model on the training set is around 0.3. Now we need to evaluate its performance on the testing set. Typically, we will see performance degrade a bit. If we see severe degradation, we assume that may have overfit the training set.   
+
+Develop predictions on the testing set
+```{r}
+test_preds = predict(mod1, newdata = test)
+```
+
+Now we can manually calculate the R squared value.  
+```{r}
+SSE = sum((test$AnnualCharges - test_preds)^2) #sum of squared residuals from model
+SST = sum((test$AnnualCharges - mean(test$AnnualCharges))^2) #sum of squared residuals from a "naive" model
+1 - SSE/SST #definition of R squared
+```
+
+
+

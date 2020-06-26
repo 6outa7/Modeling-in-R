@@ -1,0 +1,33 @@
+## Demonstrating Model Validation on Credit Dataset
+
+Libraries  
+```{r}
+library(tidyverse)
+library(caret) #for splitting for validation
+```
+
+Read-in dataset  
+```{r}
+credit = read_csv("CreditData.csv")
+```
+
+Get rid of missing data rows 
+```{r}
+credit = credit %>% drop_na() #delete any row with an NA value
+str(credit) #check structure after the drop
+```
+
+We will do pure k-fold cross-validation with no training and testing set. Can easily combine with train/test split. If you do this, do k-fold on training set.
+
+Model with best single variable (by correlation).  
+```{r}
+ctrl = trainControl(method = "cv",number = 10) #set up caret 10 fold cross validation
+
+set.seed(123) #set random number seed for cross validation
+modCV = train(AnnualCharges ~ AnnualIncome, credit, method = "lm", trControl = ctrl, metric="Rsquared")
+summary(modCV)
+```
+
+That's it. We are done. If we had done a train/test split, we would then evaluate the quality of the model on the testing set. 
+
+

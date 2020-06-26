@@ -1,0 +1,487 @@
+```{r}
+#install.packages("mice")
+#install.packages("VIM")
+#install.packages("rpart")
+#install.packages("RColorBrewer")
+#install.packages("rattle")
+
+library(mice)
+library(VIM)
+library(rpart)
+library(RColorBrewer)
+library(rattle)
+library(titanic)
+library(tidyverse)
+titanic = titanic::titanic_train
+str(titanic)
+summary(titanic)
+library(caret)
+
+
+
+```
+
+```{r}
+titanic = titanic %>% mutate(Survived = as.factor(Survived)) %>% 
+  mutate(Survived = fct_recode(Survived, "No" = "0", "Yes" = "1" )) %>%
+  mutate(Pclass = as.factor(Pclass)) %>% mutate(Sex = as.factor(Sex)) %>%
+  mutate(Embarked = as.factor(Embarked)) %>% 
+  mutate(Embarked = fct_recode(Embarked,"Unknown"="","Cherbourg"="C","Southampton"="S","Queenstown"="Q"))
+
+titanic$Cabin[titanic$Cabin==""] = NA #convert blanks in cabin to NA
+
+str(titanic)
+```
+
+```{r}
+titanic = titanic %>% select(-Cabin) 
+vim_plot = aggr(titanic, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+
+```{r}
+#select only variables relevant to our analysis
+titanic = titanic %>% select(c("Survived","Pclass","Sex","Age","SibSp","Parch","Embarked"))
+
+imp_age = mice(titanic, m=1, method='pmm', printFlag=FALSE)
+summary(imp_age)
+```
+
+```{r}
+titanic_complete = complete(imp_age) 
+summary(titanic_complete)
+```
+
+```{r}
+tree1 = rpart(Survived ~., titanic_complete, method="class")
+fancyRpartPlot(tree1)
+```
+```{r}
+printcp(tree1)
+plotcp(tree1)
+```
+
+```{r}
+tree2 = rpart(Survived ~., titanic_complete, cp=0.0001, method="class")
+fancyRpartPlot(tree2)
+```
+```{r}
+printcp(tree2)
+plotcp(tree2)
+```
+```{r}
+credit = read_csv("CSData.csv")
+str(credit)
+summary(credit)
+
+credit = credit %>% mutate(SeriousDlqin2yrs = as.factor(SeriousDlqin2yrs)) %>% 
+  mutate(SeriousDlqin2yrs = fct_recode(SeriousDlqin2yrs, "No" = "0", "Yes" = "1" )) 
+
+str(credit)
+```
+
+Data cleaning (same as done in earlier lectures).  
+```{r}
+credit = credit %>% filter(RevolvingUtilizationOfUnsecuredLines < 2)
+credit = credit %>% filter(DebtRatio < 5)
+credit = credit %>% filter(MonthlyIncome < 20000) %>% drop_na()
+credit = credit %>% filter(NumberOfOpenCreditLinesAndLoans < 40)
+credit = credit %>% filter(NumberOfTimes90DaysLate < 10)
+credit = credit %>% filter(NumberRealEstateLoansOrLines < 10)
+credit = credit %>% filter(NumberOfDependents < 10)
+```
+
+Now we'll split the data.  
+```{r}
+set.seed(123) 
+train.rows = createDataPartition(y = credit$SeriousDlqin2yrs, p=0.7, list = FALSE) #70% in training
+train = credit[train.rows,] 
+test = credit[-train.rows,]
+```
+
+```{r}
+tree1 = rpart(SeriousDlqin2yrs  ~., train, method="class")
+fancyRpartPlot(tree1)
+```
+
+```{r}
+printcp(tree1)
+plotcp(tree1)
+```
+
+Predictions on training set  
+```{r}
+treepred = predict(tree1, train, type = "class")
+head(treepred)
+```
+
+Caret confusion matrix and accuracy, etc. calcs  
+```{r}
+confusionMatrix(treepred,train$SeriousDlqin2yrs,positive="Yes") #predictions first then actual
+```
+
+Predictions on testing set  
+```{r}
+treepred_test = predict(tree1, test, type = "class")
+head(treepred_test)
+```
+
+Caret confusion matrix and accuracy, etc. calcs  
+```{r}
+confusionMatrix(treepred_test,test$SeriousDlqin2yrs,positive="Yes") #predictions first then actual
+```
+
+```{r}
+admit = read_csv("Admission-1.csv")
+```
+
+Structure and summary
+```{R}
+str(admit)
+summary(admit)
+```
+
+Factor conversion. Convert the response variable SeriousDlqin2yrs.
+```{r}
+admit = admit %>% mutate(Admission_YN = as.factor(Admission_YN)) %>% 
+  mutate(Admission_YN = fct_recode(Admission_YN, "No" = "0", "Yes" = "1" )) 
+
+str(admit)
+```
+
+Now we'll split the data.  
+```{r}
+set.seed(123) 
+train.rows = createDataPartition(y = admit$Admission_YN, p=0.7, list = FALSE) #70% in training
+train = admit[train.rows,] 
+test = admit[-train.rows,]
+```
+
+Let's build a classification tree.  
+```{r}
+tree1 = rpart(Admission_YN  ~., train, method="class")
+fancyRpartPlot(tree1)
+```
+
+```{r}
+printcp(tree1)
+plotcp(tree1)
+```
+Prune the tree (at minimum cross-validated error)  
+```{r}
+tree2 = prune(tree1,cp= tree1$cptable[which.min(tree1$cptable[,"xerror"]),"CP"])
+#most of the code in the line above can be left untouched. Just change tree1 to the name of your tree model (if it's not called tree1)
+fancyRpartPlot(tree2)
+```
+
+
+Predictions on training set  
+```{r}
+treepred = predict(tree2, train, type = "class")
+head(treepred)
+```
+
+Caret confusion matrix and accuracy, etc. calcs  
+```{r}
+confusionMatrix(treepred,train$Admission_YN,positive="Yes") #predictions first then actual
+```
+
+Predictions on testing set  
+```{r}
+treepred_test = predict(tree2, newdata=test, type = "class")
+head(treepred_test)
+```
+
+Caret confusion matrix and accuracy, etc. calcs  
+```{r}
+confusionMatrix(treepred_test,test$Admission_YN,positive="Yes") #predictions first then actual
+```
+
+```{r regression tree}
+credit2 = read_csv("CreditData.csv")
+credit2 = credit2 %>% drop_na() #delete any row with an NA value
+str(credit2) #check structure after the drop
+```
+
+Split the data (training and testing)  
+```{r}
+set.seed(123)
+train.rows = createDataPartition(y = credit2$AnnualCharges, p=0.7, list = FALSE) #70% in training
+train = credit2[train.rows,] 
+test = credit2[-train.rows,]
+```
+
+Create regression tree  
+```{r}
+regtree1 = rpart(AnnualCharges~., method="anova", train)
+fancyRpartPlot(regtree1)
+printcp(regtree1)  
+plotcp(regtree1) 
+```
+Develop predictions on the training set
+```{r}
+train_preds = predict(regtree1)
+head(train_preds) #see first six predictions
+```
+
+Now we can manually calculate the R squared value on train
+```{r}
+SSE = sum((train$AnnualCharges - train_preds)^2) #sum of squared residuals from model
+SST = sum((train$AnnualCharges - mean(train$AnnualCharges))^2) #sum of squared residuals from a "naive" model
+1 - SSE/SST #definition of R squared
+```
+
+Develop predictions on the testing set
+
+
+```{r}
+test_preds = predict(regtree1, newdata = test)
+```
+
+Now we can manually calculate the R squared value on test
+```{r}
+SSE = sum((test$AnnualCharges - test_preds)^2) #sum of squared residuals from model
+SST = sum((test$AnnualCharges - mean(test$AnnualCharges))^2) #sum of squared residuals from a "naive" model
+1 - SSE/SST #definition of R squared
+```
+
+```{r}
+titanic = titanic::titanic_train
+```
+Structure and summary
+```{r}
+str(titanic)
+summary(titanic)
+```
+
+Factor conversion and recoding (Always do this prior to splitting)  
+```{r}
+titanic = titanic %>% mutate(Survived = as.factor(Survived)) %>% 
+  mutate(Survived = fct_recode(Survived, "No" = "0", "Yes" = "1" )) %>%
+  mutate(Pclass = as.factor(Pclass)) %>% mutate(Sex = as.factor(Sex)) %>%
+  mutate(Embarked = as.factor(Embarked)) %>% 
+  mutate(Embarked = fct_recode(Embarked,"Unknown"="","Cherbourg"="C","Southampton"="S","Queenstown"="Q"))
+
+titanic$Cabin[titanic$Cabin==""] = NA #convert blanks in cabin to NA
+
+str(titanic)
+```
+
+Column-wise deletion of the "Cabin" variable (As with factor conversion/recoding, do this before splitting).  
+```{r}
+titanic = titanic %>% select(-Cabin) 
+vim_plot = aggr(titanic, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+
+```{r}
+#select only variables relevant to our analysis
+titanic = titanic %>% select(c("Survived","Pclass","Sex","Age","SibSp","Parch","Embarked"))
+
+imp_age = mice(titanic, m=1, method='pmm', printFlag=FALSE)
+summary(imp_age)
+```
+
+Merge the imputed values into our titanic data frame. Imputation is part of the data cleaning process and should occur prior to splitting. 
+```{r}
+titanic_complete = complete(imp_age) 
+summary(titanic_complete)
+```
+
+Splitting.  
+```{r}
+set.seed(123) 
+train.rows = createDataPartition(y = titanic_complete$Survived, p=0.7, list = FALSE) #70% in training
+train = titanic_complete[train.rows,] 
+test = titanic_complete[-train.rows,]
+```
+
+Now that we have the split data, let's build a classification tree. Here we use caret to manage the model building.  
+```{r}
+fit_control = trainControl(method = "cv",  
+                           number = 10) #set up 10 fold cross-validation
+
+set.seed(123)  
+rpart_fit = train(x=titanic_complete[,-1], y=titanic_complete$Survived,
+                 method = "rpart", 
+                 trControl = fit_control)
+#notice exclusion of "data = " line in block of code above. Not needed as data is explicitly indicated via non-formula interface
+```
+
+```{r}
+rpart_fit #displays the model (do not use summary as we have done before)
+#caret automatically chooses the optima value for cp. We do NOT need to prune
+```
+
+Plotting the tree.   
+```{r}
+fancyRpartPlot(rpart_fit$finalModel) #note the code to show the resulting, final tree
+```
+
+
+```{r}
+titanic = titanic::titanic_train
+```
+
+Structure and summary
+```{r}
+str(titanic)
+summary(titanic)
+```
+
+Factor conversion and recoding  
+```{r}
+titanic = titanic %>% mutate(Survived = as.factor(Survived)) %>% 
+  mutate(Survived = fct_recode(Survived, "No" = "0", "Yes" = "1" )) %>%
+  mutate(Pclass = as.factor(Pclass)) %>% mutate(Sex = as.factor(Sex)) %>%
+  mutate(Embarked = as.factor(Embarked)) %>% 
+  mutate(Embarked = fct_recode(Embarked,"Unknown"="","Cherbourg"="C","Southampton"="S","Queenstown"="Q"))
+
+titanic$Cabin[titanic$Cabin==""] = NA #convert blanks in cabin to NA
+
+str(titanic)
+```
+
+Column-wise deletion of the "Cabin" variable.  
+```{r}
+titanic = titanic %>% select(-Cabin) 
+vim_plot = aggr(titanic, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+
+```{r}
+#select only variables relevant to our analysis
+titanic = titanic %>% select(c("Survived","Pclass","Sex","Age","SibSp","Parch","Embarked"))
+
+imp_age = mice(titanic, m=1, method='pmm', printFlag=FALSE)
+summary(imp_age)
+```
+
+Merge the imputed values into our titanic data frame  
+```{r}
+titanic_complete = complete(imp_age) 
+summary(titanic_complete)
+```
+
+###Building Random Forest Model with Caret
+Note use of non-formula interface due to caret and ranger's handling of factors. The non-formula interface leaves the categorical variables as factors (usually desirable) while the formula interface converts to dummy variables.
+
+Random forest
+```{r}
+fit_control = trainControl(method = "cv",  
+                           number = 10) #set up 10 fold cross-validation
+
+#rf_fit = train(Survived ~.,
+
+set.seed(123)  
+rf_fit = train(x=titanic_complete[,-1], y=titanic_complete$Survived,
+                 method = "ranger", 
+                 importance = "permutation",
+                 trControl = fit_control)
+#notice exclusion of "data = " line in block of code above. Not needed as data is explicitly indicated via non-formula interface
+```
+
+Check out random forest details  
+```{r}
+varImp(rf_fit)
+rf_fit
+```
+
+Predictions  
+```{r}
+predRF = predict(rf_fit, titanic_complete)
+head(predRF)
+```
+
+Confusion matrix
+```{r}
+confusionMatrix(predRF, titanic_complete$Survived, positive = "Yes")
+```
+
+
+
+Load data from the CSData.csv file.  
+```{r}
+credit = read_csv("CSData.csv")
+```
+
+Structure and summary
+```{R}
+str(credit)
+summary(credit)
+```
+
+Factor conversion. Convert the response variable SeriousDlqin2yrs.
+```{r}
+credit = credit %>% mutate(SeriousDlqin2yrs = as.factor(SeriousDlqin2yrs)) %>% 
+  mutate(SeriousDlqin2yrs = fct_recode(SeriousDlqin2yrs, "No" = "0", "Yes" = "1" )) 
+
+str(credit)
+```
+
+Data cleaning (same as done in earlier).  
+```{r}
+credit = credit %>% filter(RevolvingUtilizationOfUnsecuredLines < 2)
+credit = credit %>% filter(DebtRatio < 5)
+credit = credit %>% filter(MonthlyIncome < 20000) %>% drop_na()
+credit = credit %>% filter(NumberOfOpenCreditLinesAndLoans < 40)
+credit = credit %>% filter(NumberOfTimes90DaysLate < 10)
+credit = credit %>% filter(NumberRealEstateLoansOrLines < 10)
+credit = credit %>% filter(NumberOfDependents < 10)
+```
+
+Now we'll split the data.  
+```{r}
+set.seed(123) 
+train.rows = createDataPartition(y = credit$SeriousDlqin2yrs, p=0.7, list = FALSE) #70% in training
+train = credit[train.rows,] 
+test = credit[-train.rows,]
+```
+
+Random forest with caret
+```{r}
+# fit_control = trainControl(method = "cv",
+#                            number = 10) #set up 10 fold cross-validation
+# 
+# set.seed(123)
+# rf_fit = train(x=as.matrix(train[,-1]), y=as.matrix(train$SeriousDlqin2yrs),    
+#                 method = "ranger",  
+#                 importance = "permutation",
+#                 trControl = fit_control)
+#note the as.matrix command. Passing a tibble to ranger can result in warnings.
+```
+
+Save the model to a file to load later (if needed)  
+```{r}
+# saveRDS(rf_fit, "rf_fit.rds")
+```
+
+Load the model  
+```{r}
+rf_fit = readRDS("rf_fit.rds")
+```
+
+Check out random forest details  
+```{r}
+varImp(rf_fit)
+rf_fit
+```
+
+Predictions  
+```{r}
+predRF = predict(rf_fit)
+head(predRF)
+```
+
+Confusion matrix
+```{r}
+confusionMatrix(predRF, train$SeriousDlqin2yrs, positive = "Yes")
+```
+
+Predictions on test
+```{r}
+predRF_test = predict(rf_fit, newdata = test)
+```
+
+Confusion matrix
+```{r}
+confusionMatrix(predRF_test, test$SeriousDlqin2yrs, positive = "Yes")
+
+```

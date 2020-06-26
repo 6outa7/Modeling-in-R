@@ -1,0 +1,49 @@
+## Logistic Regression (k-Fold)
+
+Libraries  
+```{r}
+library(tidyverse)
+library(MASS) #access to forward and backward selection algorithms
+library(leaps) #best subset selection
+library(caret) #for splitting functions
+library(e1071) #often needed for various statistical tasks
+```
+
+Load data from the CSData.csv file.  
+```{r}
+credit = read_csv("CSData.csv")
+```
+
+Structure and summary
+```{R}
+str(credit)
+summary(credit)
+```
+Factor conversion. Convert the response variable SeriousDlqin2yrs.
+```{r}
+credit = credit %>% mutate(SeriousDlqin2yrs = as.factor(SeriousDlqin2yrs)) %>% 
+  mutate(SeriousDlqin2yrs = fct_recode(SeriousDlqin2yrs, "No" = "0", "Yes" = "1" )) 
+
+str(credit)
+```
+
+Data cleaning (same as done in train/test).  
+```{r}
+credit = credit %>% filter(RevolvingUtilizationOfUnsecuredLines < 2)
+credit = credit %>% filter(DebtRatio < 5)
+credit = credit %>% filter(MonthlyIncome < 20000) %>% drop_na()
+credit = credit %>% filter(NumberOfOpenCreditLinesAndLoans < 40)
+credit = credit %>% filter(NumberOfTimes90DaysLate < 10)
+credit = credit %>% filter(NumberRealEstateLoansOrLines < 10)
+credit = credit %>% filter(NumberOfDependents < 10)
+```
+
+Apply k-fold **NOTE: There is no easily manageable way to do logistic regression stepwise and k-fold at the same time** However, we recognize from our stepwise approaches that the full model (all variables seems to be the best).  
+```{r}
+ctrl = trainControl(method = "cv",number = 10) #set up caret 10 fold cross validation
+
+set.seed(123) #set random number seed for cross validation
+modkFold = train(SeriousDlqin2yrs ~., credit, method = "glm", trControl = ctrl)
+summary(modkFold)
+```
+
